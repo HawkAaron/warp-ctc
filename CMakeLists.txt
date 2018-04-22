@@ -113,6 +113,10 @@ ELSE()
     TARGET_LINK_LIBRARIES(test_cpu warpctc)
     SET_TARGET_PROPERTIES(test_cpu PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
 
+    add_executable(test_time tests/test_time.cpp tests/random.cpp )
+    TARGET_LINK_LIBRARIES(test_time warpctc)
+    SET_TARGET_PROPERTIES(test_time PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
+
     INSTALL(TARGETS warpctc
             RUNTIME DESTINATION "bin"
             LIBRARY DESTINATION "lib"
