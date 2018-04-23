@@ -94,6 +94,10 @@ IF (WITH_GPU)
     TARGET_LINK_LIBRARIES(test_gpu warpctc ${CUDA_curand_LIBRARY})
     SET_TARGET_PROPERTIES(test_gpu PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
 
+    add_executable(test_time tests/test_time.cpp tests/random.cpp )
+    TARGET_LINK_LIBRARIES(test_time warpctc)
+    SET_TARGET_PROPERTIES(test_time PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
+
     INSTALL(TARGETS warpctc
             RUNTIME DESTINATION "bin"
             LIBRARY DESTINATION "lib"

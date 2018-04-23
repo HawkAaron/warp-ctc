@@ -27,14 +27,14 @@ inline void throw_on_error(cudaError_t error, const char* message) {
 
 #endif
 
-std::vector<float> genActs(int size);
+float * genActs(int size);
 std::vector<int> genLabels(int alphabet_size, int L);
 
-float rel_diff(const std::vector<float>& grad,
-               const std::vector<float>& num_grad) {
+float rel_diff(float * grad,
+               float * num_grad, int len) {
     float diff = 0.;
     float tot = 0.;
-    for(size_t idx = 0; idx < grad.size(); ++idx) {
+    for(size_t idx = 0; idx < len; ++idx) {
         diff += (grad[idx] - num_grad[idx]) * (grad[idx] - num_grad[idx]);
         tot += grad[idx] * grad[idx];
     }

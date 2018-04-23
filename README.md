@@ -4,6 +4,25 @@
 
 This is an extension onto the original repo found [here](https://github.com/baidu-research/warp-ctc).
 
+## CPU Performance
+Benchmarked on a dual-socket machine with two Intel E5-2660 v4 processors - warp-ctc used 10 threads to maximally take advantage of the CPU resources. 
+
+| **T=150, L=40, A=28** | **warp-ctc** | 
+| --------------------- | ------------ |
+|         N=1           |   1.89 ms    |
+|         N=16          |   4.40 ms    |
+|         N=32          |   6.39 ms    |
+|         N=64          |   10.77 ms   |
+|         N=128         |   19.69 ms   |
+
+| **T=150, L=20, A=5000** | **warp-ctc** |
+| ----------------------- | ------------ |
+|         N=1             |   10.22 ms   |
+|         N=16            |   23.26 ms   |
+|         N=32            |   44.70 ms   |
+|         N=64            |   79.29 ms   |
+|         N=128           |   146.83 ms  |
+
 ## Installation
 
 Install [PyTorch](https://github.com/pytorch/pytorch#installation).

@@ -15,7 +15,8 @@
 bool run_test(int B, int T, int L, int A, int num_threads) {
     std::mt19937 gen(2);
 
-    std::vector<float> acts = genActs(B * T * A);
+    int len = B * T * A;
+    float * acts = genActs(len);
 
     std::vector<std::vector<int>> labels;
     std::vector<int> sizes;
@@ -34,7 +35,7 @@ bool run_test(int B, int T, int L, int A, int num_threads) {
 
     std::vector<float> costs(B);
 
-    std::vector<float> grads(acts.size());
+    float * grads = new float[len];
 
     ctcOptions options{};
     options.loc = CTC_CPU;
@@ -48,20 +49,31 @@ bool run_test(int B, int T, int L, int A, int num_threads) {
     
     void* ctc_cpu_workspace = malloc(cpu_alloc_bytes);
 
-    auto start = std::chrono::high_resolution_clock::now();
-    throw_on_error(compute_ctc_loss(acts.data(), grads.data(),
-                                    flat_labels.data(), label_lengths.data(),
-                                    sizes.data(),
-                                    A,
-                                    B,
-                                    costs.data(),
-                                    ctc_cpu_workspace,
-                                    options),
-                    "Error: compute_ctc_loss (0) in run_test");
-    auto end = std::chrono::high_resolution_clock::now();
+    // average time
+    std::vector<float> time;
+    for (int i = 0; i < 10; ++i) {
+        auto start = std::chrono::high_resolution_clock::now();
+        throw_on_error(compute_ctc_loss(acts, grads,
+                                        flat_labels.data(), label_lengths.data(),
+                                        sizes.data(),
+                                        A,
+                                        B,
+                                        costs.data(),
+                                        ctc_cpu_workspace,
+                                        options),
+                        "Error: compute_ctc_loss (0) in run_test");
+        auto end = std::chrono::high_resolution_clock::now();
 
-    std::chrono::duration<double> elapsed = end - start;
-    std::cout << "compute_ctc_loss elapsed time: " << elapsed.count() * 1000 << " ms\n";
+        std::chrono::duration<double> elapsed = end - start;
+        time.push_back(elapsed.count() * 1000);
+        std::cout << "compute_ctc_loss elapsed time: " << elapsed.count() * 1000 << " ms\n";
+    }
+
+    float sum = 0;
+    for (int i = 0; i < 10; ++i) {
+        sum += time[i];
+    }
+    std::cout << "average 10 time cost: " << sum / time.size() << " ms\n";
 
     float cost = std::accumulate(costs.begin(), costs.end(), 0.);
 

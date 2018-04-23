@@ -247,7 +247,8 @@ bool inf_test() {
     labels[0] = 2;
     std::vector<int> label_lengths = {L};
 
-    std::vector<float> acts = genActs(alphabet_size * T * minibatch);
+    int len = alphabet_size * T * minibatch;
+    float * acts = genActs(len);
 
     for (int i = 0; i < T; ++i)
         acts[alphabet_size * i + 2] = -1e30;
@@ -257,10 +258,10 @@ bool inf_test() {
                    "cudaStreamCreate");
 
     float *acts_gpu;
-    throw_on_error(cudaMalloc(&acts_gpu, acts.size() * sizeof(float)),
+    throw_on_error(cudaMalloc(&acts_gpu, len * sizeof(float)),
                    "cudaMalloc");
-    throw_on_error(cudaMemcpyAsync(acts_gpu, acts.data(),
-                                   acts.size() * sizeof(float),
+    throw_on_error(cudaMemcpyAsync(acts_gpu, acts,
+                                   len * sizeof(float),
                                    cudaMemcpyHostToDevice, stream),
                    "cudaMemcpyAsync");
 
@@ -299,9 +300,9 @@ bool inf_test() {
 
     bool status = std::isinf(cost);
 
-    std::vector<float> grads(alphabet_size * T);
-    throw_on_error(cudaMemcpyAsync(grads.data(), grads_gpu,
-                                   grads.size() * sizeof(float),
+    float * grads = new float[len];
+    throw_on_error(cudaMemcpyAsync(grads, grads_gpu,
+                                   len * sizeof(float),
                                    cudaMemcpyDeviceToHost, stream),
                    "cudaMemcpyAsync");
     throw_on_error(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
@@ -318,7 +319,7 @@ bool inf_test() {
 }
 
 float grad_check(int T, int alphabet_size,
-                  std::vector<float>& acts,
+                  float * acts, int len,
                   const std::vector<std::vector<int>>& labels,
                   const std::vector<int>& lengths) {
 
@@ -331,10 +332,10 @@ float grad_check(int T, int alphabet_size,
                    "cudaStreamCreate");
 
     float *acts_gpu;
-    throw_on_error(cudaMalloc(&acts_gpu, acts.size() * sizeof(float)),
+    throw_on_error(cudaMalloc(&acts_gpu, len * sizeof(float)),
                    "cudaMalloc");
-    throw_on_error(cudaMemcpyAsync(acts_gpu, acts.data(),
-                                   acts.size() * sizeof(float),
+    throw_on_error(cudaMemcpyAsync(acts_gpu, acts,
+                                   len * sizeof(float),
                                    cudaMemcpyHostToDevice, stream),
                    "cudaMemcpyAsync");
 
@@ -348,7 +349,7 @@ float grad_check(int T, int alphabet_size,
     std::vector<float> costs(minibatch);
 
     float *grads_gpu;
-    throw_on_error(cudaMalloc(&grads_gpu, acts.size() * sizeof(float)),
+    throw_on_error(cudaMalloc(&grads_gpu, len * sizeof(float)),
                    "cudaMalloc");
 
     ctcOptions options{};
@@ -379,20 +380,20 @@ float grad_check(int T, int alphabet_size,
                                     options),
                    "Error: compute_ctc_loss (0) in grad_check");
 
-    std::vector<float> grads(acts.size());
-    throw_on_error(cudaMemcpyAsync(grads.data(),
-                                   grads_gpu, grads.size() * sizeof(float),
+    float * grads = new float[len];
+    throw_on_error(cudaMemcpyAsync(grads,
+                                   grads_gpu, len * sizeof(float),
                                    cudaMemcpyDeviceToHost, stream),
                    "cudaMemcpyAsync");
     throw_on_error(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
-    std::vector<float> num_grad(grads.size());
+    float * num_grad = new float[len];
 
     //perform 2nd order central differencing
     for (int i = 0; i < T * alphabet_size * minibatch; ++i) {
         acts[i] += epsilon;
 
-        throw_on_error(cudaMemcpyAsync(acts_gpu, acts.data(),
-                                       acts.size() * sizeof(float),
+        throw_on_error(cudaMemcpyAsync(acts_gpu, acts,
+                                       len * sizeof(float),
                                        cudaMemcpyHostToDevice, stream),
                        "cudaMemcpyAsync");
 
@@ -411,8 +412,8 @@ float grad_check(int T, int alphabet_size,
                        "Error: compute_ctc_loss (1) in grad_check");
 
         acts[i] -= 2 * epsilon;
-        throw_on_error(cudaMemcpyAsync(acts_gpu, acts.data(),
-                                       acts.size() * sizeof(float),
+        throw_on_error(cudaMemcpyAsync(acts_gpu, acts,
+                                       len * sizeof(float),
                                        cudaMemcpyHostToDevice, stream),
                        "cudaMemcpyAsync");
 
@@ -435,7 +436,7 @@ float grad_check(int T, int alphabet_size,
         num_grad[i] = (costP1 - costP2) / (2 * epsilon);
     }
 
-    float diff = rel_diff(grads, num_grad);
+    float diff = rel_diff(grads, num_grad, len);
 
     throw_on_error(cudaFree(acts_gpu),
                    "cudaFree");
@@ -459,7 +460,8 @@ bool run_tests() {
         float tol;
         std::tie(alphabet_size, T, L, minibatch, tol) = problem;
 
-        std::vector<float> acts = genActs(alphabet_size * T * minibatch);
+        int len = alphabet_size * T * minibatch;
+        float * acts = genActs(len);
 
         std::vector<std::vector<int>> labels;
         std::vector<int> sizes;
@@ -469,7 +471,7 @@ bool run_tests() {
             sizes.push_back(T);
         }
 
-        float diff = grad_check(T, alphabet_size, acts, labels, sizes);
+        float diff = grad_check(T, alphabet_size, acts, len, labels, sizes);
         status &= (diff < tol);
     }
 
