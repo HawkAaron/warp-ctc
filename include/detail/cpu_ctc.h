@@ -163,23 +163,23 @@ template<typename ProbT>
 void
 CpuCTC<ProbT>::softmax(const ProbT* const activations, ProbT* probs,
                        const int* const input_lengths) {
+
+    int maxT = *std::max_element(input_lengths, input_lengths + minibatch_);
 #pragma omp parallel for
-    for (int mb = 0; mb < minibatch_; ++mb) {
-        for(int c = 0; c < input_lengths[mb]; ++c) {
-            int col_offset = (mb + minibatch_ * c) * alphabet_size_;
-            ProbT max_activation = -std::numeric_limits<ProbT>::infinity();
-            for(int r = 0; r < alphabet_size_; ++r)
-                max_activation = std::max(max_activation, activations[r + col_offset]);
+    for (int c = 0; c < maxT * minibatch_; ++c) {
+        int col_offset = c * alphabet_size_;
+        ProbT max_activation = -std::numeric_limits<ProbT>::infinity();
+        for(int r = 0; r < alphabet_size_; ++r)
+            max_activation = std::max(max_activation, activations[r + col_offset]);
 
-            ProbT denom = ProbT(0.);
-            for(int r = 0; r < alphabet_size_; ++r) {
-                probs[r + col_offset] = std::exp(activations[r + col_offset] - max_activation);
-                denom += probs[r + col_offset];
-            }
+        ProbT denom = ProbT(0.);
+        for(int r = 0; r < alphabet_size_; ++r) {
+            probs[r + col_offset] = std::exp(activations[r + col_offset] - max_activation);
+            denom += probs[r + col_offset];
+        }
 
-            for(int r = 0; r < alphabet_size_; ++r) {
-                probs[r + col_offset] /= denom;
-            }
+        for(int r = 0; r < alphabet_size_; ++r) {
+            probs[r + col_offset] /= denom;
         }
     }
 }
