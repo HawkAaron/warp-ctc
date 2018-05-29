@@ -58,7 +58,7 @@ warp_ctc_includes = [os.path.join(root_path, '../include')]
 include_dirs = tf_includes + warp_ctc_includes
 
 if tf.__version__ >= '1.4':
-    include_dirs += [tf_include + '../../external/nsync/public']
+    include_dirs += [tf_include + '/../../external/nsync/public']
 
 if os.getenv("TF_CXX11_ABI") is not None:
     TF_CXX11_ABI = os.getenv("TF_CXX11_ABI")
@@ -77,10 +77,10 @@ extra_compile_args = ['-std=c++11', '-fPIC', '-D_GLIBCXX_USE_CXX11_ABI=' + TF_CX
 # current tensorflow code triggers return type errors, silence those for now
 extra_compile_args += ['-Wno-return-type']
 
+extra_link_args = []
 if tf.__version__ >= '1.4':
-    extra_link_args = ['-L' + tf.sysconfig.get_lib(), '-ltensorflow_framework']
-else:
-    extra_link_args = []
+    if os.path.exists(os.path.join(tf_src_dir, 'libtensorflow_framework.so')):
+        extra_link_args = ['-L' + tf.sysconfig.get_lib(), '-ltensorflow_framework']
 
 if (enable_gpu):
     extra_compile_args += ['-DWARPCTC_ENABLE_GPU']
@@ -113,7 +113,7 @@ ext = setuptools.Extension('warpctc_tensorflow.kernels',
                            include_dirs = include_dirs,
                            library_dirs = [warp_ctc_path],
                            runtime_library_dirs = [os.path.realpath(warp_ctc_path)],
-                           libraries = ['warpctc'],
+                           libraries = ['warpctc', 'tensorflow_framework'],
                            extra_compile_args = extra_compile_args,
                            extra_link_args = extra_link_args)
 
