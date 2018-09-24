@@ -1,17 +1,19 @@
 import torch
 import warpctc_pytorch as warp_ctc
 from torch.autograd import Function
-from torch.autograd import Variable
 from torch.nn import Module
-from torch.nn.modules.loss import _assert_no_grad
 
 from ._warp_ctc import *
 
+def _assert_no_grad(tensor):
+    assert not tensor.requires_grad, \
+        "gradients only computed for acts - please " \
+        "mark other tensors as not requiring gradients"
 
 class _CTC(Function):
     @staticmethod
     def forward(ctx, acts, labels, act_lens, label_lens, size_average=False,
-                length_average=False):
+                length_average=False, blank=0):
         is_cuda = True if acts.is_cuda else False
         acts = acts.contiguous()
         loss_func = warp_ctc.gpu_ctc if is_cuda else warp_ctc.cpu_ctc
@@ -24,7 +26,8 @@ class _CTC(Function):
                   label_lens,
                   act_lens,
                   minibatch_size,
-                  costs)
+                  costs,
+                  blank)
 
         costs = torch.FloatTensor([costs.sum()])
 
@@ -38,26 +41,29 @@ class _CTC(Function):
             grads = grads / minibatch_size
             costs = costs / minibatch_size
 
-        ctx.grads = Variable(grads)
+        ctx.grads = grads
         return costs
 
     @staticmethod
     def backward(ctx, grad_output):
-        return ctx.grads, None, None, None, None, None
+        return ctx.grads, None, None, None, None, None, None
 
 
 class CTCLoss(Module):
     """
     Parameters:
+        blank (int): blank label
+            (default: `0`)
         size_average (bool): normalize the loss by the batch size
             (default: `False`)
         length_average (bool): normalize the loss by the total number of frames
             in the batch. If `True`, supersedes `size_average`
             (default: `False`)
     """
-    def __init__(self, size_average=False, length_average=False):
+    def __init__(self, blank=0, size_average=False, length_average=False):
         super(CTCLoss, self).__init__()
         self.ctc = _CTC.apply
+        self.blank = blank
         self.size_average = size_average
         self.length_average = length_average
 
@@ -73,4 +79,4 @@ class CTCLoss(Module):
         _assert_no_grad(act_lens)
         _assert_no_grad(label_lens)
         return self.ctc(acts, labels, act_lens, label_lens, self.size_average,
-                        self.length_average)
+                        self.length_average, self.blank)

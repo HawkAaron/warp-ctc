@@ -17,7 +17,7 @@ ENDIF()
 
 include_directories(include)
 
-FIND_PACKAGE(CUDA 6.5)
+FIND_PACKAGE(CUDA)
 MESSAGE(STATUS "cuda found ${CUDA_FOUND}")
 
 option(WITH_GPU "compile warp-ctc with cuda." ${CUDA_FOUND})
@@ -55,10 +55,6 @@ if (NOT APPLE)
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --std=c++11")
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}")
 ENDIF()
-
-FIND_PACKAGE(Torch)
-
-MESSAGE(STATUS "Torch found ${Torch_DIR}")
 
 IF (APPLE)
     EXEC_PROGRAM(uname ARGS -v  OUTPUT_VARIABLE DARWIN_VERSION)
