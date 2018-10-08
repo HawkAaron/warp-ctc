@@ -59,13 +59,16 @@ class CTCLoss(Module):
         length_average (bool): normalize the loss by the total number of frames
             in the batch. If `True`, supersedes `size_average`
             (default: `False`)
+        batch_first (bool): batch dim first
+            (default: `False`)
     """
-    def __init__(self, blank=0, size_average=False, length_average=False):
+    def __init__(self, blank=0, size_average=False, length_average=False, batch_first=False):
         super(CTCLoss, self).__init__()
         self.ctc = _CTC.apply
         self.blank = blank
         self.size_average = size_average
         self.length_average = length_average
+        self.batch_first = batch_first
 
     def forward(self, acts, labels, act_lens, label_lens):
         """
@@ -78,5 +81,7 @@ class CTCLoss(Module):
         _assert_no_grad(labels)
         _assert_no_grad(act_lens)
         _assert_no_grad(label_lens)
+        if self.batch_first:
+            acts = acts.transpose(0, 1)
         return self.ctc(acts, labels, act_lens, label_lens, self.size_average,
                         self.length_average, self.blank)
