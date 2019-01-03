@@ -13,7 +13,7 @@ def _assert_no_grad(tensor):
 class _CTC(Function):
     @staticmethod
     def forward(ctx, acts, labels, act_lens, label_lens, size_average=False,
-                length_average=False, blank=0):
+                length_average=False, reduce=True, blank=0):
         is_cuda = True if acts.is_cuda else False
         acts = acts.contiguous()
         loss_func = warp_ctc.gpu_ctc if is_cuda else warp_ctc.cpu_ctc
@@ -29,7 +29,8 @@ class _CTC(Function):
                   costs,
                   blank)
 
-        costs = torch.FloatTensor([costs.sum()])
+        # costs = torch.FloatTensor([costs.sum()])
+        if reduce: costs = costs.sum()
 
         if length_average:
             # Compute the avg. log-probability per batch sample and frame.
@@ -46,7 +47,9 @@ class _CTC(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        return ctx.grads, None, None, None, None, None, None
+        # same dimension, dtype and device with grads
+        scale = grad_output.reshape(1, -1, 1).to(ctx.grads)
+        return scale * ctx.grads, None, None, None, None, None, None, None
 
 
 class CTCLoss(Module):
@@ -61,14 +64,17 @@ class CTCLoss(Module):
             (default: `False`)
         batch_first (bool): batch dim first
             (default: `False`)
+        reduce (bool): sum losses
+            (default: `True`)
     """
-    def __init__(self, blank=0, size_average=False, length_average=False, batch_first=False):
+    def __init__(self, blank=0, size_average=False, length_average=False, batch_first=False, reduce=True):
         super(CTCLoss, self).__init__()
         self.ctc = _CTC.apply
         self.blank = blank
         self.size_average = size_average
         self.length_average = length_average
         self.batch_first = batch_first
+        self.reduce = reduce
 
     def forward(self, acts, labels, act_lens, label_lens):
         """
@@ -84,4 +90,4 @@ class CTCLoss(Module):
         if self.batch_first:
             acts = acts.transpose(0, 1)
         return self.ctc(acts, labels, act_lens, label_lens, self.size_average,
-                        self.length_average, self.blank)
+                        self.length_average, self.reduce, self.blank)
