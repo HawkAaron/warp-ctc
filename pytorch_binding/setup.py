@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 import torch
 from torch.utils.ffi import create_extension
 
-extra_compile_args = ['-std=c++11', '-fPIC']
+extra_compile_args = ['-std=c++11', '-fPIC', '-std=c99']
 warp_ctc_path = "../build"
 
 if torch.cuda.is_available() or "CUDA_HOME" in os.environ:
