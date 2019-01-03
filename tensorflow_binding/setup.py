@@ -46,7 +46,7 @@ if not os.path.exists(os.path.join(warp_ctc_path, "libwarpctc"+lib_ext)):
 root_path = os.path.realpath(os.path.dirname(__file__))
 
 tf_include = tf.sysconfig.get_include()
-tf_src_dir = tf.sysconfig.get_lib()
+tf_src_dir = tf.sysconfig.get_lib() # os.environ["TENSORFLOW_SRC_PATH"]
 tf_includes = [tf_include, tf_src_dir]
 warp_ctc_includes = [os.path.join(root_path, '../include')]
 include_dirs = tf_includes + warp_ctc_includes
