@@ -30,12 +30,13 @@ Install [PyTorch](https://github.com/pytorch/pytorch#installation).
 `WARP_CTC_PATH` should be set to the location of a built WarpCTC
 (i.e. `libwarpctc.so`).  This defaults to `../build`, so from within a
 new warp-ctc clone you could build WarpCTC like this:
+(**Make sure to use the same CUDA version with PyTorch**)
 
 ```bash
 git clone https://github.com/SeanNaren/warp-ctc.git
 cd warp-ctc
 mkdir build; cd build
-cmake ..
+cmake -DCUDA_TOOLKIT_ROOT_DIR=$CUDA_HOME ..
 make
 ```
 
@@ -48,7 +49,7 @@ installed. If you have a GPU, you should also make sure that
 export CUDA_HOME="/usr/local/cuda"
 ```
 
-Now install the bindings:
+Now install the bindings: (**Please use GCC 5 if PyTorch >= 0.4**)
 ```
 cd pytorch_binding
 python setup.py install
