@@ -36,7 +36,7 @@ const char* ctcGetStatusString(ctcStatus_t status) {
 }
 
 
-ctcStatus_t compute_ctc_loss(const float* const activations,
+ctcStatus_t compute_ctc_loss(const float* const probs,
                              float* gradients,
                              const int* const flat_labels,
                              const int* const label_lengths,
@@ -47,7 +47,7 @@ ctcStatus_t compute_ctc_loss(const float* const activations,
                              void *workspace,
                              ctcOptions options) {
 
-    if (activations == nullptr ||
+    if (probs == nullptr ||
         flat_labels == nullptr ||
         label_lengths == nullptr ||
         input_lengths == nullptr ||
@@ -62,12 +62,12 @@ ctcStatus_t compute_ctc_loss(const float* const activations,
                           options.blank_label);
 
         if (gradients != NULL)
-            return ctc.cost_and_grad(activations, gradients,
+            return ctc.cost_and_grad(probs, gradients,
                                      costs,
                                      flat_labels, label_lengths,
                                      input_lengths);
         else
-            return ctc.score_forward(activations, costs, flat_labels,
+            return ctc.score_forward(probs, costs, flat_labels,
                                      label_lengths, input_lengths);
     } else if (options.loc == CTC_GPU) {
 #ifdef __CUDACC__
@@ -75,11 +75,11 @@ ctcStatus_t compute_ctc_loss(const float* const activations,
                           options.blank_label);
 
         if (gradients != NULL)
-            return ctc.cost_and_grad(activations, gradients, costs,
+            return ctc.cost_and_grad(probs, gradients, costs,
                                      flat_labels, label_lengths,
                                      input_lengths);
         else
-            return ctc.score_forward(activations, costs, flat_labels,
+            return ctc.score_forward(probs, costs, flat_labels,
                                      label_lengths, input_lengths);
 #else
         std::cerr << "GPU execution requested, but not compiled with GPU support" << std::endl;
@@ -138,12 +138,6 @@ ctcStatus_t get_workspace_size(const int* const label_lengths,
         //alphas
         *size_bytes += sizeof(float) * S * maxT * minibatch;
 
-        //denoms
-        *size_bytes += sizeof(float) * maxT * minibatch;
-
-        //probs (since we will pass in activations)
-        *size_bytes += sizeof(float) * alphabet_size * maxT * minibatch;
-
     } else {
         //cpu can eventually replace all minibatch with
         //max number of concurrent threads if memory is
@@ -166,8 +160,6 @@ ctcStatus_t get_workspace_size(const int* const label_lengths,
 
         *size_bytes = per_minibatch_bytes * minibatch;
 
-        //probs
-        *size_bytes += sizeof(float) * alphabet_size * maxT * minibatch;
     }
 
     return CTC_STATUS_SUCCESS;

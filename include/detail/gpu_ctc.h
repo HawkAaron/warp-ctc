@@ -21,7 +21,7 @@ class GpuCTC {
         GpuCTC& operator=(const GpuCTC&) = delete;
 
         ctcStatus_t
-        cost_and_grad(const ProbT* const activations,
+        cost_and_grad(const ProbT* const probs,
                       ProbT* grads,
                       ProbT* costs,
                       const int* const flat_labels,
@@ -29,7 +29,7 @@ class GpuCTC {
                       const int* const input_lengths);
 
         ctcStatus_t
-        score_forward(const ProbT* const activations,
+        score_forward(const ProbT* const probs,
                       ProbT* costs,
                       const int* const flat_labels,
                       const int* const label_lengths,
@@ -62,10 +62,7 @@ class GpuCTC {
                                           size_t& best_config);
 
         ctcStatus_t
-        compute_probs(const ProbT* const activations);
-
-        ctcStatus_t
-        compute_cost_and_score(const ProbT* const activations,
+        compute_cost_and_score(const ProbT* const probs,
                                ProbT* grads,
                                ProbT* costs,
                                const int* const flat_labels,
@@ -81,8 +78,6 @@ class GpuCTC {
         int S_;
         int T_;
 
-        int activation_cols_; // Number of columns in activations
-
         CUstream stream_;
         int blank_label_;
 
@@ -96,8 +91,6 @@ class GpuCTC {
         ProbT *alphas_;
         ProbT *nll_forward_;
         ProbT *nll_backward_;
-        ProbT *denoms_; // Temporary storage for denoms for softmax
-        ProbT *probs_; // Temporary storage for probabilities (softmax output)
 };
 
 template<typename ProbT>
@@ -197,8 +190,6 @@ GpuCTC<ProbT>::setup_gpu_metadata(const int* const flat_labels,
     S_ = 2 * S_ + 1;
     const int Smax = 2 * Lmax + 1;
 
-    activation_cols_ = minibatch_ * Tmax;
-
     // Allocate memory for T
     utt_length_ =
         reinterpret_cast<int *>(static_cast<char*>(gpu_workspace_) +
@@ -240,17 +231,6 @@ GpuCTC<ProbT>::setup_gpu_metadata(const int* const flat_labels,
         reinterpret_cast<ProbT *>(static_cast<char*>(gpu_workspace_) +
                                   gpu_bytes_used);
     gpu_bytes_used += (S_ * T_) * minibatch_ * sizeof(ProbT);
-
-
-    denoms_ =
-        reinterpret_cast<ProbT *>(static_cast<char*>(gpu_workspace_) +
-                                  gpu_bytes_used);
-    gpu_bytes_used += activation_cols_ * sizeof(ProbT);
-
-    probs_ =
-        reinterpret_cast<ProbT *>(static_cast<char*>(gpu_workspace_) +
-                                  gpu_bytes_used);
-    gpu_bytes_used += out_dim_ * activation_cols_ * sizeof(ProbT);
 
     return CTC_STATUS_SUCCESS;
 }
@@ -355,52 +335,7 @@ GpuCTC<ProbT>::launch_gpu_kernels(const ProbT* const probs,
 
 template<typename ProbT>
 ctcStatus_t
-GpuCTC<ProbT>::compute_probs(const ProbT* const activations) {
-
-    cudaError_t cuda_status;
-    cuda_status =
-        cudaMemcpyAsync(probs_, activations,
-                        activation_cols_ * out_dim_ *sizeof(ProbT),
-                        cudaMemcpyDeviceToDevice, stream_);
-    if (cuda_status != cudaSuccess)
-        return CTC_STATUS_MEMOPS_FAILED;
-
-    // Numerically stable SM
-    ctcStatus_t ctc_status =
-        reduce_max(probs_, denoms_, out_dim_,
-                   activation_cols_, 1, stream_);
-    if (ctc_status != CTC_STATUS_SUCCESS)
-        return ctc_status;
-
-    // Kernel launch to subtract maximum
-    const int NT = 128;
-    const int VT = 1;
-    const int NV = NT * VT;
-    const int num_elements = out_dim_ * activation_cols_;
-    const int grid_size = ctc_helper::div_up(num_elements, NV);
-
-    prepare_stable_SM_kernel<ProbT, VT> <<< grid_size, NT, 0, stream_>>>
-       (ctc_helper::identity<ProbT>(), probs_,
-        denoms_, out_dim_, num_elements);
-
-    // Reduce along columns to calculate denominator
-    ctc_status =
-        reduce_exp(probs_, denoms_, out_dim_,
-                   activation_cols_, 1, stream_);
-    if (ctc_status != CTC_STATUS_SUCCESS)
-        return ctc_status;
-
-    // Kernel launch to calculate probabilities
-    compute_probs_kernel<ProbT, VT><<<grid_size, NT, 0, stream_>>>
-        (ctc_helper::exponential<ProbT>(), probs_,
-         denoms_, out_dim_, num_elements);
-
-    return CTC_STATUS_SUCCESS;
-}
-
-template<typename ProbT>
-ctcStatus_t
-GpuCTC<ProbT>::compute_cost_and_score(const ProbT* const activations,
+GpuCTC<ProbT>::compute_cost_and_score(const ProbT* const probs,
                                       ProbT* grads,
                                       ProbT* costs,
                                       const int* const flat_labels,
@@ -417,11 +352,7 @@ GpuCTC<ProbT>::compute_cost_and_score(const ProbT* const activations,
     if (status != CTC_STATUS_SUCCESS)
         return status;
 
-    status = compute_probs(activations);
-    if (status != CTC_STATUS_SUCCESS)
-        return status;
-
-    launch_gpu_kernels(probs_, grads, best_config,
+    launch_gpu_kernels(probs, grads, best_config,
                        compute_alpha, compute_betas_and_grad);
 
     cudaError_t cuda_status_mem, cuda_status_sync;
@@ -437,13 +368,13 @@ GpuCTC<ProbT>::compute_cost_and_score(const ProbT* const activations,
 
 template<typename ProbT>
 ctcStatus_t
-GpuCTC<ProbT>::cost_and_grad(const ProbT* const activations,
+GpuCTC<ProbT>::cost_and_grad(const ProbT* const probs,
                              ProbT* grads,
                              ProbT* costs,
                              const int* const flat_labels,
                              const int* const label_lengths,
                              const int* const input_lengths) {
-    if (activations == nullptr ||
+    if (probs == nullptr ||
         grads == nullptr ||
         costs == nullptr ||
         flat_labels == nullptr ||
@@ -452,18 +383,18 @@ GpuCTC<ProbT>::cost_and_grad(const ProbT* const activations,
         )
         return CTC_STATUS_INVALID_VALUE;
 
-    return compute_cost_and_score(activations, grads, costs, flat_labels,
+    return compute_cost_and_score(probs, grads, costs, flat_labels,
                                   label_lengths, input_lengths, true, true);
 }
 
 template<typename ProbT>
 ctcStatus_t
-GpuCTC<ProbT>::score_forward(const ProbT* const activations,
+GpuCTC<ProbT>::score_forward(const ProbT* const probs,
                              ProbT* costs,
                              const int* const flat_labels,
                              const int* const label_lengths,
                              const int* const input_lengths) {
-    if (activations == nullptr ||
+    if (probs == nullptr ||
         costs == nullptr ||
         flat_labels == nullptr ||
         label_lengths == nullptr ||
@@ -471,7 +402,7 @@ GpuCTC<ProbT>::score_forward(const ProbT* const activations,
         )
         return CTC_STATUS_INVALID_VALUE;
 
-    return compute_cost_and_score(activations, nullptr, costs, flat_labels,
+    return compute_cost_and_score(probs , nullptr, costs, flat_labels,
                                   label_lengths, input_lengths, true, false);
 }
 

@@ -1,5 +1,5 @@
 import torch
-import warpctc_pytorch as warp_ctc
+import warpctc_softmax as warp_ctc
 from torch.autograd import Function
 from torch.nn import Module
 

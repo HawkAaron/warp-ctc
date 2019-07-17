@@ -86,15 +86,15 @@ IF (WITH_GPU)
         TARGET_LINK_LIBRARIES(warpctc ${CUDA_curand_LIBRARY})
     ENDIF()
 
-    add_executable(test_cpu tests/test_cpu.cpp tests/random.cpp )
+    add_executable(test_cpu tests/test_cpu.cpp)
     TARGET_LINK_LIBRARIES(test_cpu warpctc)
     SET_TARGET_PROPERTIES(test_cpu PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
 
-    cuda_add_executable(test_gpu tests/test_gpu.cu tests/random.cpp )
+    cuda_add_executable(test_gpu tests/test_gpu.cu)
     TARGET_LINK_LIBRARIES(test_gpu warpctc ${CUDA_curand_LIBRARY})
     SET_TARGET_PROPERTIES(test_gpu PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
 
-    add_executable(test_time tests/test_time.cpp tests/random.cpp )
+    add_executable(test_time tests/test_time.cpp)
     TARGET_LINK_LIBRARIES(test_time warpctc)
     SET_TARGET_PROPERTIES(test_time PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
 
@@ -113,11 +113,11 @@ ELSE()
 
     ADD_LIBRARY(warpctc SHARED src/ctc_entrypoint.cpp)
 
-    add_executable(test_cpu tests/test_cpu.cpp tests/random.cpp )
+    add_executable(test_cpu tests/test_cpu.cpp)
     TARGET_LINK_LIBRARIES(test_cpu warpctc)
     SET_TARGET_PROPERTIES(test_cpu PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
 
-    add_executable(test_time tests/test_time.cpp tests/random.cpp )
+    add_executable(test_time tests/test_time.cpp)
     TARGET_LINK_LIBRARIES(test_time warpctc)
     SET_TARGET_PROPERTIES(test_time PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
 

@@ -16,7 +16,7 @@ bool run_test(int B, int T, int L, int A, int num_threads) {
     std::mt19937 gen(2);
 
     int len = B * T * A;
-    float * acts = genActs(len);
+    std::vector<float> acts = genActs(len);
 
     std::vector<std::vector<int>> labels;
     std::vector<int> sizes;
@@ -53,7 +53,7 @@ bool run_test(int B, int T, int L, int A, int num_threads) {
     std::vector<float> time;
     for (int i = 0; i < 10; ++i) {
         auto start = std::chrono::high_resolution_clock::now();
-        throw_on_error(compute_ctc_loss(acts, grads,
+        throw_on_error(compute_ctc_loss(acts.data(), grads,
                                         flat_labels.data(), label_lengths.data(),
                                         sizes.data(),
                                         A,

@@ -409,7 +409,7 @@ void compute_betas_and_grad_kernel (const ProbT* probs, const int *label_sizes,
 
             for (int idx = tid; idx < out_dim; idx += blockDim.x) {
                 const int grads_offset = prob_offset + start_prob_col + idx;
-                grads[grads_offset] = probs[grads_offset];
+                grads[grads_offset] = 0; // probs[grads_offset];
             }
 
             __syncthreads();
@@ -422,8 +422,7 @@ void compute_betas_and_grad_kernel (const ProbT* probs, const int *label_sizes,
                 if ((grad == 0.0) || (probs[grads_offset] == 0.0) ||
                     (grad == ctc_helper::neg_inf<ProbT>())) {
                 } else {
-                    grads[grads_offset] =
-                        probs[grads_offset] - exp(grad - log(probs[grads_offset]) - log_partition);
+                    grads[grads_offset] = -exp(grad - 2 * log(probs[grads_offset]) - log_partition);
                 }
             }
 

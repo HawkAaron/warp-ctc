@@ -35,7 +35,7 @@ if not os.path.exists(os.path.join(warp_ctc_path, "libwarpctc" + lib_ext)):
 include_dirs = [os.path.realpath('../include')]
 
 setup(
-    name="warpctc_pytorch",
+    name="warpctc_softmax",
     version="0.1",
     description="PyTorch wrapper for warp-ctc",
     url="https://github.com/baidu-research/warp-ctc",
@@ -45,7 +45,7 @@ setup(
     packages=find_packages(),
     ext_modules=[
         build_extension(
-            name='warpctc_pytorch._warp_ctc',
+            name='warpctc_softmax._warp_ctc',
             language='c++',
             sources=['src/binding.cpp'],
             include_dirs=include_dirs,

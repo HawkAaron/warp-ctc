@@ -2,9 +2,7 @@
 
 #include <stdexcept>
 #include <vector>
-#include <limits>
-#include <numeric>
-
+#include <random>
 
 #include <ctc.h>
 
@@ -27,14 +25,39 @@ inline void throw_on_error(cudaError_t error, const char* message) {
 
 #endif
 
-float * genActs(int size);
-std::vector<int> genLabels(int alphabet_size, int L);
+std::vector<float>
+genActs(int size) {
+    std::vector<float> arr(size);
+    std::mt19937 gen(0);
+    std::uniform_real_distribution<> dis(0, 1);
+    for(int i = 0; i < size; ++i)
+        arr[i] = dis(gen);
+    return arr;
+}
 
-float rel_diff(float * grad,
-               float * num_grad, int len) {
+std::vector<int>
+genLabels(int alphabet_size, int L) {
+    std::vector<int> label(L);
+
+    std::mt19937 gen(1);
+    std::uniform_int_distribution<> dis(1, alphabet_size - 1);
+
+    for(int i = 0; i < L; ++i) {
+        label[i] = dis(gen);
+    }
+    // guarantee repeats for testing
+    if (L >= 3) {
+        label[L / 2] = label[L / 2 + 1];
+        label[L / 2 - 1] = label[L / 2];
+    }
+    return label;
+}
+
+float rel_diff(const std::vector<float>& grad,
+               const std::vector<float>& num_grad) {
     float diff = 0.;
     float tot = 0.;
-    for(size_t idx = 0; idx < len; ++idx) {
+    for(size_t idx = 0; idx < grad.size(); ++idx) {
         diff += (grad[idx] - num_grad[idx]) * (grad[idx] - num_grad[idx]);
         tot += grad[idx] * grad[idx];
     }
