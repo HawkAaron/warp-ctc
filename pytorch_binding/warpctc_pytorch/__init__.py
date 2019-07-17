@@ -37,7 +37,7 @@ class _CTC(Function):
             total_length = torch.sum(act_lens)
             grads /= total_length
             costs /= total_length
-        elif size_average:
+        if size_average:
             # Compute the avg. log-probability per batch sample.
             grads /= minibatch_size
             costs /= minibatch_size
@@ -88,6 +88,6 @@ class CTCLoss(Module):
         _assert_no_grad(act_lens)
         _assert_no_grad(label_lens)
         if self.batch_first:
-            acts = acts.transpose(0, 1)
+            acts = acts.transpose(0, 1).contiguous()
         return self.ctc(acts, labels, act_lens, label_lens, self.size_average,
                         self.length_average, self.reduce, self.blank)
