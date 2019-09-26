@@ -112,7 +112,11 @@ __device__ __forceinline__ float shfl_up(float var,
 	unsigned int delta, int width = 32) {
 
 #if __CUDA_ARCH__ >= 300
-	var = __shfl_up(var, delta, width);
+#if CUDART_VERSION < 9000
+    var = __shfl_up(var, delta, width);
+#else
+    var = __shfl_up_sync(0xFFFFFFFF, var, delta, width);
+#endif
 #endif
 	return var;
 }
@@ -122,8 +126,13 @@ __device__ __forceinline__ double shfl_up(double var,
 
 #if __CUDA_ARCH__ >= 300
 	int2 p = mgpu::double_as_int2(var);
-	p.x = __shfl_up(p.x, delta, width);
-	p.y = __shfl_up(p.y, delta, width);
+#if CUDART_VERSION < 9000
+    p.x = __shfl_up(p.x, delta, width);
+    p.y = __shfl_up(p.y, delta, width);
+#else
+    p.x = __shfl_up_sync(0xFFFFFFFF, p.x, delta, width);
+    p.y = __shfl_up_sync(0xFFFFFFFF, p.y, delta, width);
+#endif
 	var = mgpu::int2_as_double(p);
 #endif
 
