@@ -9,7 +9,6 @@
 #ifdef WARPCTC_ENABLE_GPU
     #include "THC.h"
     #include "THCTensor.h"
-    #include "detail/reduce.h"
     extern THCState* state;
 #endif
 
@@ -21,14 +20,6 @@ int cpu_ctc(torch::Tensor probs,
             int minibatch_size,
             torch::Tensor costs,
             int blank_label) {
-
-    float *probs_ptr = (float*) probs.data_ptr();
-    float *grads_ptr = grads.storage() ? (float*) grads.data_ptr() : NULL;
-
-    int *sizes_ptr = (int*) sizes.data_ptr();
-    int *labels_ptr = (int*) labels.data_ptr();
-    int *label_sizes_ptr = (int*) label_sizes.data_ptr();
-    float *costs_ptr = (float*) costs.data_ptr();
 
     int probs_size = probs.size(2);
 
@@ -43,21 +34,48 @@ int cpu_ctc(torch::Tensor probs,
     options.num_threads = std::max(options.num_threads, (unsigned int) 1);
 #endif
 
-    size_t cpu_size_bytes;
-    get_workspace_size(label_sizes_ptr, sizes_ptr,
-                       probs_size, minibatch_size,
-                       options, &cpu_size_bytes);
+    size_t cpu_size_bytes = 0;
+    //void* cpu_workspace = 0;
+    switch (probs.type().scalarType()) {
+      case torch::ScalarType::Float:
+        {
+        get_workspace_size(label_sizes.data<int>(), sizes.data<int>(),
+                           probs_size, minibatch_size,
+                           options, &cpu_size_bytes);
 
-    float* cpu_workspace = (float*) new unsigned char[cpu_size_bytes];
+        float* cpu_workspace = (float*) new char[cpu_size_bytes];
 
-    compute_ctc_loss(probs_ptr, grads_ptr,
-                     labels_ptr, label_sizes_ptr,
-                     sizes_ptr, probs_size,
-                     minibatch_size, costs_ptr,
-                     cpu_workspace, options);
+        compute_ctc_loss(probs.data<float>(), grads.data<float>(),
+                         labels.data<int>(), label_sizes.data<int>(),
+                         sizes.data<int>(), probs_size,
+                         minibatch_size, costs.data<float>(),
+                         cpu_workspace, options);
 
-    delete cpu_workspace;
-    return 1;
+        delete cpu_workspace;
+        }
+        return 0;
+      case torch::ScalarType::Double:
+        {
+        get_workspace_size_f64(label_sizes.data<int>(), sizes.data<int>(),
+                           probs_size, minibatch_size,
+                           options, &cpu_size_bytes);
+
+        double* cpu_workspace = (double*) new char[cpu_size_bytes];
+
+        compute_ctc_loss_f64(probs.data<double>(), grads.data<double>(),
+                         labels.data<int>(), label_sizes.data<int>(),
+                         sizes.data<int>(), probs_size,
+                         minibatch_size, costs.data<double>(),
+                         cpu_workspace, options);
+
+        delete cpu_workspace;
+        }
+        return 0;
+        break;
+      default:
+        std::cerr << __FILE__ << ':' << __LINE__ << ": " << "unsuported data type" << std::endl;
+    }
+    return -1;
 }
 #ifdef WARPCTC_ENABLE_GPU
 int gpu_ctc(torch::Tensor probs,
@@ -69,14 +87,6 @@ int gpu_ctc(torch::Tensor probs,
            torch::Tensor costs,
            int blank_label) {
 
-    float *probs_ptr = (float*) probs.data_ptr();
-    float *grads_ptr = grads.storage() ? (float*) grads.data_ptr() : NULL;
-
-    int *sizes_ptr = (int*) sizes.data_ptr();
-    int *labels_ptr = (int*) labels.data_ptr();
-    int *label_sizes_ptr = (int*) label_sizes.data_ptr();
-    float *costs_ptr = (float*) costs.data_ptr();
-
     int probs_size = probs.size(2);
 
     ctcOptions options;
@@ -85,23 +95,50 @@ int gpu_ctc(torch::Tensor probs,
     options.blank_label = blank_label;
     options.stream = THCState_getCurrentStream(state);
 
-    size_t gpu_size_bytes;
-    get_workspace_size(label_sizes_ptr, sizes_ptr,
-                      probs_size, minibatch_size,
-                      options, &gpu_size_bytes);
+    size_t gpu_size_bytes = 0;
+    switch (probs.type().scalarType()) {
+      case torch::ScalarType::Float:
+        {
+        get_workspace_size(label_sizes.data<int>(), sizes.data<int>(),
+                          probs_size, minibatch_size,
+                          options, &gpu_size_bytes);
 
-    int device_id = probs.get_device();
-    cudaSetDevice(device_id);
-    void* gpu_workspace = THCudaMalloc(state, gpu_size_bytes);
+        int device_id = probs.get_device();
+        cudaSetDevice(device_id);
+        void* gpu_workspace = THCudaMalloc(state, gpu_size_bytes);
 
-    compute_ctc_loss(probs_ptr, grads_ptr,
-                    labels_ptr, label_sizes_ptr,
-                    sizes_ptr, probs_size,
-                    minibatch_size, costs_ptr,
-                    gpu_workspace, options);
+        compute_ctc_loss(probs.data<float>(), grads.data<float>(),
+                        labels.data<int>(), label_sizes.data<int>(),
+                        sizes.data<int>(), probs_size,
+                        minibatch_size, costs.data<float>(),
+                        gpu_workspace, options);
 
-    THCudaFree(state, gpu_workspace);
-    return 1;
+        THCudaFree(state, gpu_workspace);
+        }
+        return 0;
+      case torch::ScalarType::Double:
+        {
+        get_workspace_size_f64(label_sizes.data<int>(), sizes.data<int>(),
+                          probs_size, minibatch_size,
+                          options, &gpu_size_bytes);
+
+        int device_id = probs.get_device();
+        cudaSetDevice(device_id);
+        void* gpu_workspace = THCudaMalloc(state, gpu_size_bytes);
+
+        compute_ctc_loss_f64(probs.data<double>(), grads.data<double>(),
+                        labels.data<int>(), label_sizes.data<int>(),
+                        sizes.data<int>(), probs_size,
+                        minibatch_size, costs.data<double>(),
+                        gpu_workspace, options);
+
+        THCudaFree(state, gpu_workspace);
+        }
+        return 0;
+      default:
+        std::cerr << __FILE__ << ':' << __LINE__ << ": " << "unsuported data type" << std::endl;
+    }
+    return -1;
 }
 #endif
 

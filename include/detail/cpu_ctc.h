@@ -402,13 +402,13 @@ CpuCTC<ProbT>::cost_and_grad(const ProbT* const activations,
     int maxS = 2 * maxL + 1;
 
     //output
-    per_minibatch_bytes += sizeof(float) * alphabet_size_;
+    per_minibatch_bytes += sizeof(ProbT) * alphabet_size_;
 
     //alphas
-    per_minibatch_bytes += sizeof(float) * maxS * maxT;
+    per_minibatch_bytes += sizeof(ProbT) * maxS * maxT;
 
     //betas
-    per_minibatch_bytes += sizeof(float) * maxS;
+    per_minibatch_bytes += sizeof(ProbT) * maxS;
 
     //labels w/blanks, e_inc, s_inc
     per_minibatch_bytes += 3 * sizeof(int) * maxS;
@@ -460,13 +460,13 @@ ctcStatus_t CpuCTC<ProbT>::score_forward(const ProbT* const activations,
     int maxS = 2 * maxL + 1;
 
     //output
-    per_minibatch_bytes += sizeof(float) * alphabet_size_;
+    per_minibatch_bytes += sizeof(ProbT) * alphabet_size_;
 
     //alphas
-    per_minibatch_bytes += sizeof(float) * maxS * maxT;
+    per_minibatch_bytes += sizeof(ProbT) * maxS * maxT;
 
     //betas
-    per_minibatch_bytes += sizeof(float) * maxS;
+    per_minibatch_bytes += sizeof(ProbT) * maxS;
 
     //labels w/blanks, e_inc, s_inc
     per_minibatch_bytes += 3 * sizeof(int) * maxS;

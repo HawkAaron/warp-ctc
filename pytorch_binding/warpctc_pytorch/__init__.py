@@ -19,7 +19,7 @@ class _CTC(Function):
         loss_func = warp_ctc.gpu_ctc if is_cuda else warp_ctc.cpu_ctc
         grads = torch.zeros(acts.size()).type_as(acts)
         minibatch_size = acts.size(1)
-        costs = torch.zeros(minibatch_size).cpu()
+        costs = torch.zeros(minibatch_size).to(acts.dtype)
         loss_func(acts,
                   grads,
                   labels,
